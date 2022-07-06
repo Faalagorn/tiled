@@ -142,6 +142,7 @@ SOURCES += aboutdialog.cpp \
     selectionrectangle.cpp \
     stampbrush.cpp \
     tiledapplication.cpp \
+    tiledeftextfile.cpp \
     tilelayeritem.cpp \
     tileoverlaydialog.cpp \
     tileoverlayfile.cpp \
@@ -361,6 +362,7 @@ HEADERS += aboutdialog.h \
     selectionrectangle.h \
     stampbrush.h \
     tiledapplication.h \
+    tiledeftextfile.h \
     tilelayeritem.h \
     tileoverlaydialog.h \
     tileoverlayfile.h \
