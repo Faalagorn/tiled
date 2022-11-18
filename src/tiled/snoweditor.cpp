@@ -23,6 +23,7 @@
 #include "tilemetainfomgr.h"
 #include "tilesetmanager.h"
 #include "zoomable.h"
+#include "zprogress.h"
 
 #include "tile.h"
 #include "tileset.h"
@@ -49,7 +50,13 @@ SnowEditor::SnowEditor(QWidget *parent) :
 
     connect(ui->actionOpen, &QAction::triggered, this, qOverload<>(&SnowEditor::fileOpen));
     connect(ui->actionSave, &QAction::triggered, this, qOverload<>(&SnowEditor::fileSave));
+    connect(ui->actionReset, &QAction::triggered, this, &SnowEditor::clearProperties);
     connect(ui->actionClose, &QAction::triggered, this, &QWidget::close);
+
+    ui->propertyName->setClearButtonEnabled(true);
+    ui->propertyName->setEnabled(false);
+    connect(ui->propertyName, &QLineEdit::textEdited, this,
+            &SnowEditor::propertyNameEdited);
 
     ui->filterEditSource->setClearButtonEnabled(true);
     ui->filterEditSource->setEnabled(false);
@@ -65,6 +72,8 @@ SnowEditor::SnowEditor(QWidget *parent) :
     ui->targetView->setAcceptDrops(true);
     connect(ui->targetView->model(), &MixedTilesetModel::tileDroppedAt,
             this, &SnowEditor::tileDroppedAt);
+    connect(ui->targetView->selectionModel(), &QItemSelectionModel::selectionChanged,
+            this, &SnowEditor::syncUI);
 
     ui->targetView->setZoomable(mZoomable);
     ui->sourceView->setZoomable(mZoomable);
@@ -83,6 +92,8 @@ SnowEditor::SnowEditor(QWidget *parent) :
     connect(ui->tilesetMgrTarget, &QAbstractButton::clicked,
             this, &SnowEditor::manageTilesets);
 
+    ui->targetView->setSelectionMode(QAbstractItemView::ExtendedSelection);
+
     ui->sourceView->setSelectionMode(QAbstractItemView::ExtendedSelection);
     ui->sourceView->setDragEnabled(true);
 
@@ -96,13 +107,7 @@ SnowEditor::SnowEditor(QWidget *parent) :
     connect(TilesetManager::instance(), &TilesetManager::tilesetChanged,
             this, &SnowEditor::tilesetChanged);
 
-//    mCurrentTilesetSource = TileMetaInfoMgr::instance()->tileset(QStringLiteral("e_roof_snow_1"));
-//    if (mCurrentTilesetSource) {
-//        ui->sourceView->setTileset(mCurrentTilesetSource);
-//    }
-
-//    setTilesetTargetList();
-//    setTilesetSourceList();
+    syncUI();
 }
 
 SnowEditor::~SnowEditor()
@@ -116,27 +121,38 @@ void SnowEditor::manageTilesets()
     dialog.exec();
 
     TileMetaInfoMgr *mgr = TileMetaInfoMgr::instance();
-    if (!mgr->writeTxt())
+    if (!mgr->writeTxt()) {
         QMessageBox::warning(this, tr("It's no good, Jim!"), mgr->errorString());
+    }
 }
 
 void SnowEditor::tileDroppedAt(const QString &tilesetName, int tileId, int row, int column, const QModelIndex &parent)
 {
-    QModelIndex index = ui->targetView->model()->index(row, column, parent);
-    Tile* targetTile = ui->targetView->model()->tileAt(index);
-    if (targetTile == nullptr)
+    MixedTilesetModel *model = ui->targetView->model();
+    QModelIndex index = model->index(row, column, parent);
+    Tile* targetTile = model->tileAt(index);
+    if (targetTile == nullptr) {
         return;
-    QString tileName = BuildingTilesMgr::instance()->nameForTile(targetTile);
-    QString snowName = BuildingTilesMgr::instance()->nameForTile(tilesetName, tileId);
-
+    }
+    QString snowName = BuildingTilesMgr::instance()->nameForTile2(tilesetName, tileId);
     if (TileDefTileset *tdts = mTileDefFile->tileset(targetTile->tileset()->name())) {
         if (TileDefTile *tdt = tdts->tileAt(targetTile->id())) {
-            tdt->mPropertyUI.ChangePropertiesV(QStringLiteral("SnowTile"), snowName);
+            if (tdt->mPropertyUI.property(mPropertyName) != nullptr) {
+                tdt->mPropertyUI.ChangePropertiesV(mPropertyName, snowName);
+            }
         }
     }
+    setOverlayTiles();
+}
 
-    Tile *snowTile = BuildingTilesMgr::instance()->tileFor(snowName);
-    ui->targetView->model()->setOverlayTile(index, snowTile);
+void SnowEditor::propertyNameEdited(const QString &text)
+{
+    QString trimmed = text.trimmed();
+    if (trimmed == mPropertyName) {
+        return;
+    }
+    mPropertyName = trimmed;
+    setOverlayTiles();
 }
 
 void SnowEditor::tilesetFilterSourceEdited(const QString &text)
@@ -222,31 +238,7 @@ void SnowEditor::tilesetSelectionChanged(QListWidget *tilesetNamesList, Tiled::I
         } else {
             tilesetView->setTileset(*tilesetPtr);
             if (tilesetView == ui->targetView) {
-                MixedTilesetModel *model = tilesetView->model();
-                TileDefTileset *tdts = mTileDefFile->tileset((*tilesetPtr)->name());
-                if (tdts != nullptr) {
-                    for (int tileId = 0; tileId < (*tilesetPtr)->tileCount(); tileId++) {
-                        TileDefTile *tdt = tdts->tileAt(tileId);
-                        if (tdt == nullptr)
-                            continue;
-                        UIProperties::UIProperty *property = tdt->property(QStringLiteral("SnowTile"));
-                        if (property == nullptr)
-                            continue;
-                        if (property->getString().isEmpty())
-                            continue;
-                        QString snowTileName =property->getString();
-                        QString snowTilesetName;
-                        int snowTileId;
-                        if (BuildingTilesMgr::instance()->parseTileName(snowTileName, snowTilesetName, snowTileId)) {
-                            if (Tileset *snowTileset = TileMetaInfoMgr::instance()->tileset(snowTilesetName)) {
-                                if (Tile *snowTile = snowTileset->tileAt(snowTileId)) {
-                                    Tile *tile = (*tilesetPtr)->tileAt(tileId);
-                                    model->setOverlayTile(model->index(tile), snowTile);
-                                }
-                            }
-                        }
-                    }
-                }
+                setOverlayTiles();
             }
         }
     } else {
@@ -255,9 +247,65 @@ void SnowEditor::tilesetSelectionChanged(QListWidget *tilesetNamesList, Tiled::I
     syncUI();
 }
 
+void SnowEditor::clearOverlayTiles()
+{
+    if (mCurrentTilesetTarget == nullptr) {
+        return;
+    }
+    MixedTilesetModel *model = ui->targetView->model();
+    for (int tileId = 0; tileId < mCurrentTilesetTarget->tileCount(); tileId++) {
+        Tile *tile = mCurrentTilesetTarget->tileAt(tileId);
+        model->clearCategoryBounds(model->index(tile));
+        model->setOverlayTile(model->index(tile), nullptr);
+    }
+    ui->targetView->update();
+}
+
+void SnowEditor::setOverlayTiles()
+{
+    if (mCurrentTilesetTarget == nullptr) {
+        return;
+    }
+    clearOverlayTiles();
+    MixedTilesetModel *model = ui->targetView->model();
+    if (mPropertyName.isEmpty()) {
+        return;
+    }
+    TileDefTileset *tdts = mTileDefFile->tileset(mCurrentTilesetTarget->name());
+    if (tdts == nullptr) {
+        return;
+    }
+    for (int tileId = 0; tileId < mCurrentTilesetTarget->tileCount(); tileId++) {
+        TileDefTile *tdt = tdts->tileAt(tileId);
+        if (tdt == nullptr)
+            continue;
+        UIProperties::UIProperty *property = tdt->property(mPropertyName);
+        if (property == nullptr)
+            continue;
+        if (property->getString().isEmpty())
+            continue;
+        QString snowTileName =property->getString();
+        QString snowTilesetName;
+        int snowTileId;
+        if (BuildingTilesMgr::instance()->parseTileName(snowTileName, snowTilesetName, snowTileId)) {
+            if (Tileset *snowTileset = TileMetaInfoMgr::instance()->tileset(snowTilesetName)) {
+                if (Tile *snowTile = snowTileset->tileAt(snowTileId)) {
+                    Tile *tile = mCurrentTilesetTarget->tileAt(tileId);
+                    model->setOverlayTile(model->index(tile), snowTile);
+                    model->setCategoryBounds(tile, QRect(0, 0, 1, 1));
+                }
+            }
+        }
+    }
+    ui->targetView->update();
+}
+
 void SnowEditor::syncUI()
 {
-
+    bool bHasFile = mTileDefFile != nullptr;
+    ui->actionSave->setEnabled(bHasFile);
+    ui->propertyName->setEnabled(bHasFile);
+    ui->actionReset->setEnabled(bHasFile && ui->targetView->selectionModel()->hasSelection());
 }
 
 void SnowEditor::setTilesetList(QLineEdit *lineEdit, QListWidget *tilesetNamesList)
@@ -285,6 +333,7 @@ void SnowEditor::setTilesetList(QLineEdit *lineEdit, QListWidget *tilesetNamesLi
 
 void SnowEditor::fileOpen(const QString &filePath)
 {
+    PROGRESS progress(tr("Reading %1").arg(QFileInfo(filePath).fileName()));
     mTileDefFile = new TileDefFile();
     if (!mTileDefFile->read(filePath)) {
         QMessageBox::warning(this, tr("Error"), mTileDefFile->errorString());
@@ -418,4 +467,23 @@ bool SnowEditor::fileSave()
     if (fileName.isEmpty())
         return false;
     return fileSave(fileName);
+}
+
+void SnowEditor::clearProperties()
+{
+    if (mCurrentTilesetTarget == nullptr)
+        return;
+    TileDefTileset *tdts = mTileDefFile->tileset(mCurrentTilesetTarget->name());
+    const QModelIndexList selection = ui->targetView->selectionModel()->selectedIndexes();
+    for (const QModelIndex& index : selection) {
+        Tile *tile = ui->targetView->model()->tileAt(index);
+        if (tile == nullptr)
+            continue;
+        if (TileDefTile *tdt = tdts->tileAt(tile->id())) {
+            if (UIProperties::UIProperty *property = tdt->mPropertyUI.property(mPropertyName)) {
+                tdt->mPropertyUI.ChangePropertiesV(mPropertyName, property->defaultValue());
+            }
+        }
+    }
+    setOverlayTiles();
 }

@@ -48,6 +48,7 @@ public:
 private slots:
     void manageTilesets();
     void tileDroppedAt(const QString &tilesetName, int tileId, int row, int column, const QModelIndex &parent);
+    void propertyNameEdited(const QString &text);
     void tilesetFilterSourceEdited(const QString &text);
     void tilesetFilterTargetEdited(const QString &text);
     void tilesetSelectionChangedSource();
@@ -62,12 +63,16 @@ private slots:
     void fileOpen();
     bool fileSave();
 
+    void clearProperties();
+
 private:
     void tilesetFilterEdited(QListWidget *tilesetNamesList, const QString &text);
     void setTilesetSourceList();
     void setTilesetTargetList();
     void setTilesetList(QLineEdit *lineEdit, QListWidget *tilesetNamesList);
     void tilesetSelectionChanged(QListWidget *tilesetNamesList, Tiled::Internal::MixedTilesetView *tilesetView, Tiled::Tileset **tilesetPtr);
+    void clearOverlayTiles();
+    void setOverlayTiles();
     void fileOpen(const QString& filePath);
     bool fileSave(const QString& filePath);
     bool confirmSave();
@@ -79,6 +84,7 @@ private:
     Tiled::Tileset *mCurrentTilesetTarget = nullptr;
     Tiled::Tileset *mCurrentTilesetSource = nullptr;
     Tiled::Internal::Zoomable *mZoomable = nullptr;
+    QString mPropertyName;
 };
 
 #endif // SNOWEDITOR_H

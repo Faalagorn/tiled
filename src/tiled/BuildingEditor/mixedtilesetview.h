@@ -84,6 +84,7 @@ public:
     void setCategoryBounds(const QModelIndex &index, const QRect &bounds);
     void setCategoryBounds(Tile *tile, const QRect &bounds);
     void setCategoryBounds(int tileIndex, const QRect &bounds);
+    void clearCategoryBounds(const QModelIndex &index);
     QRect categoryBounds(const QModelIndex &index) const;
     QRect categoryBounds(Tile *tile) const;
 

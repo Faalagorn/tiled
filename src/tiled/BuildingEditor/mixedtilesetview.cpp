@@ -924,13 +924,15 @@ void *MixedTilesetModel::userDataAt(const QModelIndex &index) const
 void MixedTilesetModel::setCategoryBounds(const QModelIndex &index, const QRect &bounds)
 {
     QRect viewBounds = bounds.translated(index.column(), index.row());
-    for (int x = 0; x < bounds.width(); x++)
+    for (int x = 0; x < bounds.width(); x++) {
         for (int y = 0; y < bounds.height(); y++) {
             if (Item *item = toItem(this->index(index.row() + y, index.column() + x))) {
-                if (item->mTile)
+                if (item->mTile) {
                     item->mCategoryBounds = viewBounds;
+                }
             }
         }
+    }
 }
 
 void MixedTilesetModel::setCategoryBounds(Tile *tile, const QRect &bounds)
@@ -951,6 +953,23 @@ void MixedTilesetModel::setCategoryBounds(int tileIndex, const QRect &bounds)
         int itemIndex = indexOf(item);
         QModelIndex index = createIndex(itemIndex / columnCount(), itemIndex % columnCount(), item);
         setCategoryBounds(index, bounds);
+    }
+}
+
+void MixedTilesetModel::clearCategoryBounds(const QModelIndex &index)
+{
+    QRect bounds = categoryBounds(index);
+    if (bounds.isEmpty()) {
+        return;
+    }
+    for (int x = 0; x < bounds.width(); x++) {
+        for (int y = 0; y < bounds.height(); y++) {
+            if (Item *item = toItem(this->index(bounds.top() + y, bounds.left() + x))) {
+                if (item->mTile) {
+                    item->mCategoryBounds = QRect();
+                }
+            }
+        }
     }
 }
 
