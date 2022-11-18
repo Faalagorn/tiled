@@ -1826,6 +1826,17 @@ void MainWindow::enflatulator()
 
 void MainWindow::snowEditor()
 {
+    TilePropertyMgr *propMgr = TilePropertyMgr::instance();
+    if (!propMgr->hasReadTxt()) {
+        if (!propMgr->readTxt()) {
+            QMessageBox::warning(this, tr("It's no good, Jim!"),
+                                 tr("%1\n(while reading %2)")
+                                 .arg(propMgr->errorString()).arg(propMgr->txtName()));
+            TilePropertyMgr::deleteInstance();
+            return;
+        }
+    }
+
     if (mSnowEditor == nullptr) {
         mSnowEditor = new SnowEditor(this);
     }

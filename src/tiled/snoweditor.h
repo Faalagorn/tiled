@@ -32,34 +32,10 @@ namespace Tiled {
 class Tileset;
 namespace Internal {
 class MixedTilesetView;
+class TileDefFile;
 class Zoomable;
 }
 }
-
-class SnowEditorTile
-{
-public:
-    QString mNormal;
-    QString mSnow;
-};
-
-class SnowEditorFile
-{
-public:
-    SnowEditorFile();
-    ~SnowEditorFile() { qDeleteAll(mTiles); }
-
-    bool read(const QString &fileName);
-    bool write(const QString &fileName, const QList<SnowEditorTile*> tiles);
-
-    QList<SnowEditorTile*> takeTiles();
-
-    QString errorString() { return mError; }
-
-private:
-    QList<SnowEditorTile*> mTiles;
-    QString mError;
-};
 
 class SnowEditor : public QMainWindow
 {
@@ -99,8 +75,7 @@ private:
 
 private:
     Ui::SnowEditor *ui;
-    QMap<QString, QString> mAssignments;
-    QString mFileName;
+    Tiled::Internal::TileDefFile *mTileDefFile = nullptr;
     Tiled::Tileset *mCurrentTilesetTarget = nullptr;
     Tiled::Tileset *mCurrentTilesetSource = nullptr;
     Tiled::Internal::Zoomable *mZoomable = nullptr;

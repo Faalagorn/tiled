@@ -18,6 +18,7 @@
 #include "snoweditor.h"
 #include "ui_snoweditor.h"
 
+#include "tiledeffile.h"
 #include "tilemetainfodialog.h"
 #include "tilemetainfomgr.h"
 #include "tilesetmanager.h"
@@ -27,7 +28,6 @@
 #include "tileset.h"
 
 #include "BuildingEditor/buildingtiles.h"
-#include "BuildingEditor/simplefile.h"
 
 #include <QDebug>
 #include <QDir>
@@ -96,13 +96,13 @@ SnowEditor::SnowEditor(QWidget *parent) :
     connect(TilesetManager::instance(), &TilesetManager::tilesetChanged,
             this, &SnowEditor::tilesetChanged);
 
-    mCurrentTilesetSource = TileMetaInfoMgr::instance()->tileset(QStringLiteral("e_roof_snow_1"));
-    if (mCurrentTilesetSource) {
-        ui->sourceView->setTileset(mCurrentTilesetSource);
-    }
+//    mCurrentTilesetSource = TileMetaInfoMgr::instance()->tileset(QStringLiteral("e_roof_snow_1"));
+//    if (mCurrentTilesetSource) {
+//        ui->sourceView->setTileset(mCurrentTilesetSource);
+//    }
 
-    setTilesetTargetList();
-    setTilesetSourceList();
+//    setTilesetTargetList();
+//    setTilesetSourceList();
 }
 
 SnowEditor::~SnowEditor()
@@ -123,12 +123,18 @@ void SnowEditor::manageTilesets()
 void SnowEditor::tileDroppedAt(const QString &tilesetName, int tileId, int row, int column, const QModelIndex &parent)
 {
     QModelIndex index = ui->targetView->model()->index(row, column, parent);
-    Tile* tile = ui->targetView->model()->tileAt(index);
-    if (tile == nullptr)
+    Tile* targetTile = ui->targetView->model()->tileAt(index);
+    if (targetTile == nullptr)
         return;
-    QString tileName = BuildingTilesMgr::instance()->nameForTile(tile);
+    QString tileName = BuildingTilesMgr::instance()->nameForTile(targetTile);
     QString snowName = BuildingTilesMgr::instance()->nameForTile(tilesetName, tileId);
-    mAssignments[tileName] = snowName;
+
+    if (TileDefTileset *tdts = mTileDefFile->tileset(targetTile->tileset()->name())) {
+        if (TileDefTile *tdt = tdts->tileAt(targetTile->id())) {
+            tdt->mPropertyUI.ChangePropertiesV(QStringLiteral("SnowTile"), snowName);
+        }
+    }
+
     Tile *snowTile = BuildingTilesMgr::instance()->tileFor(snowName);
     ui->targetView->model()->setOverlayTile(index, snowTile);
 }
@@ -211,22 +217,30 @@ void SnowEditor::tilesetSelectionChanged(QListWidget *tilesetNamesList, Tiled::I
     if (item) {
         int row = tilesetNamesList->row(item);
         *tilesetPtr = TileMetaInfoMgr::instance()->tileset(row);
-        if ((*tilesetPtr)->isMissing())
+        if ((*tilesetPtr)->isMissing()) {
             tilesetView->clear();
-        else {
+        } else {
             tilesetView->setTileset(*tilesetPtr);
             if (tilesetView == ui->targetView) {
                 MixedTilesetModel *model = tilesetView->model();
-                for (int tileId = 0; tileId < (*tilesetPtr)->tileCount(); tileId++) {
-                    Tile *tile = (*tilesetPtr)->tileAt(tileId);
-                    QString tileName = BuildingTilesMgr::nameForTile(tile);
-                    if (mAssignments.contains(tileName)) {
-                        QString snowTileName = mAssignments[tileName];
+                TileDefTileset *tdts = mTileDefFile->tileset((*tilesetPtr)->name());
+                if (tdts != nullptr) {
+                    for (int tileId = 0; tileId < (*tilesetPtr)->tileCount(); tileId++) {
+                        TileDefTile *tdt = tdts->tileAt(tileId);
+                        if (tdt == nullptr)
+                            continue;
+                        UIProperties::UIProperty *property = tdt->property(QStringLiteral("SnowTile"));
+                        if (property == nullptr)
+                            continue;
+                        if (property->getString().isEmpty())
+                            continue;
+                        QString snowTileName =property->getString();
                         QString snowTilesetName;
                         int snowTileId;
                         if (BuildingTilesMgr::instance()->parseTileName(snowTileName, snowTilesetName, snowTileId)) {
                             if (Tileset *snowTileset = TileMetaInfoMgr::instance()->tileset(snowTilesetName)) {
                                 if (Tile *snowTile = snowTileset->tileAt(snowTileId)) {
+                                    Tile *tile = (*tilesetPtr)->tileAt(tileId);
                                     model->setOverlayTile(model->index(tile), snowTile);
                                 }
                             }
@@ -271,43 +285,31 @@ void SnowEditor::setTilesetList(QLineEdit *lineEdit, QListWidget *tilesetNamesLi
 
 void SnowEditor::fileOpen(const QString &filePath)
 {
-    SnowEditorFile file;
-    if (!file.read(filePath)) {
-        QMessageBox::warning(this, tr("Error"), file.errorString());
+    mTileDefFile = new TileDefFile();
+    if (!mTileDefFile->read(filePath)) {
+        QMessageBox::warning(this, tr("Error"), mTileDefFile->errorString());
+        delete mTileDefFile;
+        mTileDefFile = nullptr;
         return;
     }
-    mAssignments.clear();
-    mFileName = filePath;
-    const QList<SnowEditorTile*> tiles = file.takeTiles();
-    for (SnowEditorTile *tile : tiles) {
-        mAssignments[tile->mNormal] = tile->mSnow;
-    }
-    qDeleteAll(tiles);
+
+    setTilesetTargetList();
+    setTilesetSourceList();
 }
 
 bool SnowEditor::fileSave(const QString &filePath)
 {
-    QList<SnowEditorTile*> tiles;
-    const QStringList keys = mAssignments.keys();
-    for (const QString &key : keys) {
-        SnowEditorTile *tile = new SnowEditorTile;
-        tile->mNormal = key;
-        tile->mSnow = mAssignments.value(key);
-        tiles += tile;
-    }
-    SnowEditorFile file;
-    if (!file.write(filePath, tiles)) {
-        QMessageBox::warning(this, tr("Error"), file.errorString());
-        qDeleteAll(tiles);
+    if (!mTileDefFile->write(filePath)) {
+        QMessageBox::warning(this, tr("Error"), mTileDefFile->errorString());
         return false;
     }
-    qDeleteAll(tiles);
+    mTileDefFile->setFileName(filePath);
     return true;
 }
 
 bool SnowEditor::confirmSave()
 {
-    if (mFileName.isEmpty())
+    if (mTileDefFile == nullptr)
         return true;
 
     int ret = QMessageBox::warning(
@@ -328,13 +330,13 @@ QString SnowEditor::getSaveLocation()
 {
     QSettings settings;
     QString key = QLatin1String("SnowEditor/LastOpenPath");
-    QString suggestedFileName = QLatin1String("ice-queen.txt");
-    if (!mFileName.isEmpty()) {
-        suggestedFileName = mFileName;
+    QString suggestedFileName = QLatin1String("newtiledefintiions.tiles");
+    if (mTileDefFile != nullptr) {
+        suggestedFileName = mTileDefFile->fileName();
     }
     QString fileName = QFileDialog::getSaveFileName(this, tr("Save As"),
                                                     suggestedFileName,
-                                                    QLatin1String("Text files (*.txt)"));
+                                                    QLatin1String("Tile properties files (*.tiles)"));
     if (fileName.isEmpty())
         return QString();
     settings.setValue(key, QFileInfo(fileName).absolutePath());
@@ -395,11 +397,11 @@ void SnowEditor::fileOpen()
 
     QSettings settings;
     QString key = QLatin1String("SnowEditor/LastOpenPath");
-    QString lastPath = settings.value(key, QStringLiteral("ice-queen.txt")).toString();
+    QString lastPath = settings.value(key, QStringLiteral("newtiledefinitions.tiles")).toString();
 
-    QString fileName = QFileDialog::getOpenFileName(this, tr("Choose .txt file"),
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Choose .tiles file"),
                                                     lastPath,
-                                                    QLatin1String("Text files (*.txt)"));
+                                                    QLatin1String("Tile properties files (*.tiles)"));
     if (fileName.isEmpty())
         return;
 
@@ -416,67 +418,4 @@ bool SnowEditor::fileSave()
     if (fileName.isEmpty())
         return false;
     return fileSave(fileName);
-}
-
-/////
-
-#define VERSION1 1
-#define VERSION_LATEST VERSION1
-
-SnowEditorFile::SnowEditorFile()
-{
-
-}
-
-bool SnowEditorFile::read(const QString &fileName)
-{
-    SimpleFile simpleFile;
-    if (!simpleFile.read(fileName)) {
-        mError = QStringLiteral("%1\n(while reading %2)")
-                .arg(simpleFile.errorString())
-                .arg(QDir::toNativeSeparators(fileName));
-        return false;
-    }
-
-    if (simpleFile.version() != VERSION_LATEST) {
-        mError = QStringLiteral("Expected %1 version %2, got %3")
-                .arg(fileName).arg(VERSION_LATEST).arg(simpleFile.version());
-        return false;
-    }
-
-    mTiles.clear();
-
-    for (const SimpleFileKeyValue& keyValue : qAsConst(simpleFile.values)) {
-        if (keyValue.name == QStringLiteral("version")) {
-            continue;
-        }
-        SnowEditorTile *tile = new SnowEditorTile;
-        tile->mNormal = BuildingTilesMgr::instance()->normalizeTileName(keyValue.name.trimmed());
-        tile->mSnow = BuildingTilesMgr::instance()->normalizeTileName(keyValue.value.trimmed());
-        mTiles += tile;
-    }
-
-    return true;
-}
-
-bool SnowEditorFile::write(const QString &fileName, const QList<SnowEditorTile *> tiles)
-{
-    SimpleFile simpleFile;
-    for (SnowEditorTile *tile : tiles) {
-        simpleFile.addValue(tile->mNormal, tile->mSnow);
-    }
-    qDebug() << "WRITE " << fileName;
-    simpleFile.setVersion(VERSION_LATEST);
-    if (!simpleFile.write(fileName)) {
-        mError = simpleFile.errorString();
-        return false;
-    }
-    return true;
-}
-
-QList<SnowEditorTile *> SnowEditorFile::takeTiles()
-{
-    QList<SnowEditorTile *> tiles = mTiles;
-    mTiles.clear();
-    return tiles;
 }
