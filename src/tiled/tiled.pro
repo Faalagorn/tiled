@@ -141,6 +141,7 @@ SOURCES += aboutdialog.cpp \
     resizemapobject.cpp \
     saveasimagedialog.cpp \
     selectionrectangle.cpp \
+    snoweditor.cpp \
     stampbrush.cpp \
     tiledapplication.cpp \
     tilelayeritem.cpp \
@@ -361,6 +362,7 @@ HEADERS += aboutdialog.h \
     resizemapobject.h \
     saveasimagedialog.h \
     selectionrectangle.h \
+    snoweditor.h \
     stampbrush.h \
     tiledapplication.h \
     tilelayeritem.h \
@@ -528,6 +530,7 @@ FORMS += aboutdialog.ui \
     BuildingEditor/templatefrombuildingdialog.ui \
     BuildingEditor/resizebuildingdialog.ui \
     BuildingEditor/listofstringsdialog.ui \
+    snoweditor.ui \
     tilemetainfodialog.ui \
     BuildingEditor/buildingfloorsdialog.ui \
     BuildingEditor/buildingtilesetdock.ui \

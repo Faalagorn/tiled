@@ -21,8 +21,11 @@
 #include "worldcell.h"
 #include "worldreader.h"
 
+#include "mainwindow.h"
+
 #include <QDebug>
 #include <QFileInfo>
+#include <QMessageBox>
 
 using namespace WorldEd;
 
@@ -55,8 +58,10 @@ void WorldEdMgr::addProject(const QString &fileName)
 {
     WorldReader reader;
     World *world = reader.readWorld(fileName);
-    if (!world)
+    if (world == nullptr) {
+        QMessageBox::warning(Tiled::Internal::MainWindow::instance(), QLatin1String("Error reading PZW"), reader.errorString());
         return;
+    }
 
     mWorlds += world;
     mWorldFileNames += fileName;
@@ -89,6 +94,7 @@ WorldCell *WorldEdMgr::cellForMap(const QString &fileName)
             return nameToCell[canonicalPath];
         }
     }
+
     mMapWithoutWorld.insert(fileName);
     return nullptr;
 }

@@ -173,6 +173,7 @@
     <addaction name="menuOverlays"/>
     <addaction name="actionRearrangeTiles"/>
     <addaction name="actionEnflatulator"/>
+    <addaction name="actionSnowEditor"/>
     <addaction name="actionWorldEd"/>
     <addaction name="separator"/>
     <addaction name="actionConvertOrientation"/>
@@ -671,6 +672,11 @@
    </property>
    <property name="toolTip">
     <string>Export New Binary</string>
+   </property>
+  </action>
+  <action name="actionSnowEditor">
+   <property name="text">
+    <string>Snow Editor...</string>
    </property>
   </action>
  </widget>

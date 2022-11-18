@@ -165,6 +165,13 @@ void TileDelegate::paint(QPainter *painter,
                                            -(dw - dw/2) - margins.right(), -extra - labelHeight - margins.bottom());
     painter->drawImage(imageRect, tile->image());
 
+    if (Tile *overlay = m->overlayTile(index)) {
+        const QMargins margins = overlay->drawMargins(mView->zoomable()->scale());
+        QRect imageRect = option.rect.adjusted(dw/2 + margins.left(), extra + margins.top(),
+                                               -(dw - dw/2) - margins.right(), -extra - labelHeight - margins.bottom());
+        painter->drawImage(imageRect, overlay->image());
+    }
+
     if (m->showLabels()) {
         QString name = fm.elidedText(label, Qt::ElideRight, option.rect.width());
         painter->drawText(option.rect.left(), option.rect.bottom() - labelHeight,
@@ -207,6 +214,12 @@ void TileDelegate::paint(QPainter *painter,
                           imageRect.topLeft() + tileToPixelCoords(1, 1, mView->zoomable()->scale(), 0, 1));
         painter->drawLine(imageRect.topLeft() + tileToPixelCoords(1, 1, mView->zoomable()->scale(), 0, 1),
                           imageRect.topLeft() + tileToPixelCoords(1, 1, mView->zoomable()->scale(), 0, 0));
+    }
+
+    // Drag-and-drop
+    if (index == m->dropIndex()) {
+        QRect r = option.rect.adjusted(extra, extra, -extra, -extra);
+        painter->drawRect(r);
     }
 
     // Focus rect around 'current' item
@@ -322,6 +335,40 @@ void MixedTilesetView::mouseReleaseEvent(QMouseEvent *event)
     }
 
     QTableView::mouseReleaseEvent(event);
+}
+
+void MixedTilesetView::dragMoveEvent(QDragMoveEvent *event)
+{
+    QAbstractItemView::dragMoveEvent(event);
+
+    if (event->isAccepted()) {
+#if QT_VERSION < QT_VERSION_CHECK(6, 0, 0)
+        QModelIndex index = indexAt(event->pos());
+#else
+        QModelIndex index = indexAt(event->position().toPoint());
+#endif
+        if (model()->tileAt(index) == nullptr) {
+            event->ignore();
+            return;
+        }
+        model()->setDropCoords(index);
+    } else {
+        model()->setDropCoords(QModelIndex());
+        event->ignore();
+        return;
+    }
+}
+
+void MixedTilesetView::dragLeaveEvent(QDragLeaveEvent *event)
+{
+    model()->setDropCoords(QModelIndex());
+    QAbstractItemView::dragLeaveEvent(event);
+}
+
+void MixedTilesetView::dropEvent(QDropEvent *event)
+{
+    QAbstractItemView::dropEvent(event);
+    model()->setDropCoords(QModelIndex());
 }
 
 void MixedTilesetView::wheelEvent(QWheelEvent *event)
@@ -652,12 +699,15 @@ QModelIndex MixedTilesetModel::index(void *userData)
 }
 
 QString MixedTilesetModel::mMimeType(QLatin1String("application/x-tilezed-tile"));
+QString MixedTilesetModel::mGridMimeType(QLatin1String("application/x-tilezed-tile-grid"));
 
 QStringList MixedTilesetModel::mimeTypes() const
 {
     QStringList types;
     types << mMimeType;
-    return types;}
+    types << mGridMimeType;
+    return types;
+}
 
 QMimeData *MixedTilesetModel::mimeData(const QModelIndexList &indexes) const
 {
@@ -674,6 +724,32 @@ QMimeData *MixedTilesetModel::mimeData(const QModelIndexList &indexes) const
     }
 
     mimeData->setData(mMimeType, encodedData);
+
+    {
+        int minX = 1000, minY = 1000, maxX = -1, maxY = -1;
+        for (const QModelIndex &index : indexes) {
+            if (Tile *tile = tileAt(index)) {
+                minX = std::min(minX, index.column());
+                minY = std::min(minY, index.row());
+                maxX = std::max(maxX, index.column());
+                maxY = std::max(maxY, index.row());
+            }
+        }
+        if (minX <= maxX) {
+            encodedData.clear();
+            QDataStream stream2(&encodedData, QIODevice::WriteOnly);
+            for (const QModelIndex &index : indexes) {
+                if (Tile *tile = tileAt(index)) {
+                    stream2 << quint16(index.column() - minX);
+                    stream2 << quint16(index.row() - minY);
+                    stream2 << tile->tileset()->name();
+                    stream2 << tile->id();
+                }
+            }
+            mimeData->setData(mGridMimeType, encodedData);
+        }
+    }
+
     return mimeData;
 }
 
@@ -687,6 +763,24 @@ bool MixedTilesetModel::dropMimeData(const QMimeData *data, Qt::DropAction actio
     if (action == Qt::IgnoreAction)
          return true;
 
+    if (data->hasFormat(mGridMimeType)) {
+        row = dropIndex().row();
+        column = dropIndex().column();
+        QByteArray encodedData = data->data(mGridMimeType);
+        QDataStream stream(&encodedData, QIODevice::ReadOnly);
+        while (!stream.atEnd()) {
+            quint16 dx, dy;
+            stream >> dx;
+            stream >> dy;
+            QString tilesetName;
+            stream >> tilesetName;
+            int tileId;
+            stream >> tileId;
+            emit tileDroppedAt(tilesetName, tileId, row + dy, column + dx, parent);
+        }
+        return true;
+    }
+
      if (!data->hasFormat(mMimeType))
          return false;
 
@@ -699,6 +793,7 @@ bool MixedTilesetModel::dropMimeData(const QMimeData *data, Qt::DropAction actio
          int tileId;
          stream >> tileId;
          emit tileDropped(tilesetName, tileId);
+         emit tileDroppedAt(tilesetName, tileId, row, column, parent);
      }
 
      return true;
@@ -875,6 +970,31 @@ QRect MixedTilesetModel::categoryBounds(Tile *tile) const
             return item->mCategoryBounds;
     }
     return QRect();
+}
+
+void MixedTilesetModel::setOverlayTile(const QModelIndex &index, Tile *tile)
+{
+    if (Item *item = toItem(index)) {
+        if (item->mTile) {
+            item->mOverlayTile = tile;
+        }
+    }
+}
+
+Tile *MixedTilesetModel::overlayTile(const QModelIndex &index) const
+{
+    if (Item *item = toItem(index)) {
+        return item->mOverlayTile;
+    }
+    return nullptr;
+}
+
+Tile *MixedTilesetModel::overlayTile(Tile *tile) const
+{
+    if (Item *item = toItem(tile)) {
+        return item->mOverlayTile;
+    }
+    return nullptr;
 }
 
 void MixedTilesetModel::scaleChanged(qreal scale)

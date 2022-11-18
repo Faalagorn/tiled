@@ -22,7 +22,6 @@
 
 #include "BuildingEditor/buildingtiles.h"
 
-#include "containeroverlayfile.h"
 #include "tilemetainfomgr.h"
 #include "tilesetmanager.h"
 #include "zoomable.h"
@@ -76,7 +75,7 @@ public:
 private:
     float parseAlpha(AbstractOverlayEntry* entry) const
     {
-        QStringList ss = entry->usage().split(QLatin1Char(';'));
+        const QStringList ss = entry->usage().split(QLatin1Char(';'));
         for (QString s : ss) {
             s = s.trimmed();
             if (s.startsWith(QLatin1String("alpha="))) {

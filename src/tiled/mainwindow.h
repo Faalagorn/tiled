@@ -43,6 +43,7 @@ class MainWindow;
 
 #ifdef ZOMBOID
 class ContainerOverlayDialog;
+class SnowEditor;
 class TileOverlayDialog;
 
 namespace BuildingEditor {
@@ -240,6 +241,7 @@ public slots:
     void containerOverlayDialog();
     void tileOverlayDialog();
     void enflatulator();
+    void snowEditor();
     void launchWorldEd();
 
     void brushSizeMinus();
@@ -353,6 +355,7 @@ private:
     TileDefDialog *mTileDefDialog;
     ContainerOverlayDialog *mContainerOverlayDialog;
     TileOverlayDialog *mTileOverlayDialog = nullptr;
+    SnowEditor *mSnowEditor = nullptr;
 #endif
 };
 

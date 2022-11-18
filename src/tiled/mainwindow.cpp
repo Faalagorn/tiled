@@ -38,7 +38,6 @@
 #include "eraser.h"
 #include "erasetiles.h"
 #include "bucketfilltool.h"
-#include "filltiles.h"
 #include "languagemanager.h"
 #include "layer.h"
 #include "layerdock.h"
@@ -77,7 +76,6 @@
 #include "commandbutton.h"
 #include "objectsdock.h"
 #ifdef ZOMBOID
-#include "bmpblender.h"
 #include "bmpclipboard.h"
 #include "bmptool.h"
 #include "changetileselection.h"
@@ -87,9 +85,6 @@
 #include "converttolotdialog.h"
 #include "convertorientationdialog.h"
 #include "createpackdialog.h"
-#include "curbtool.h"
-#include "edgetool.h"
-#include "fencetool.h"
 #include "luatiletool.h"
 #include "luatooldialog.h"
 #include "mapcomposite.h"
@@ -100,6 +95,7 @@
 #include "packviewer.h"
 #include "picktiletool.h"
 #include "roomdeftool.h"
+#include "snoweditor.h"
 #include "tiledefcompare.h"
 #include "tiledefdialog.h"
 #include "tiledeffile.h"
@@ -672,6 +668,7 @@ MainWindow::MainWindow(QWidget *parent, Qt::WindowFlags flags)
     connect(mUi->actionTileOverlays, &QAction::triggered, this, &MainWindow::tileOverlayDialog);
     mUi->actionEnflatulator->setVisible(false); // !!!
     connect(mUi->actionEnflatulator, &QAction::triggered, this, &MainWindow::enflatulator);
+    connect(mUi->actionSnowEditor, &QAction::triggered, this, &MainWindow::snowEditor);
     connect(mUi->actionWorldEd, &QAction::triggered,
             this, &MainWindow::launchWorldEd);
 #endif
@@ -1000,7 +997,7 @@ bool MainWindow::InitConfigFiles()
 
     foreach (QString configFile, configFiles) {
         QString fileName = configPath + QLatin1Char('/') + configFile;
-        if (!QFileInfo(fileName).exists()) {
+        if (!QFileInfo::exists(fileName)) {
             QString source = Preferences::instance()->appConfigPath(configFile);
             if (QFileInfo(source).exists()) {
                 if (!QFile::copy(source, fileName)) {
@@ -1827,6 +1824,25 @@ void MainWindow::enflatulator()
     d.exec();
 }
 
+void MainWindow::snowEditor()
+{
+    if (mSnowEditor == nullptr) {
+        mSnowEditor = new SnowEditor(this);
+    }
+    mSnowEditor->show();
+    mSnowEditor->raise();
+
+    TileMetaInfoMgr *mgr = TileMetaInfoMgr::instance();
+    for (Tileset *ts : mgr->tilesets()) {
+        if (ts->isMissing()) {
+            PROGRESS progress(tr("Loading Tilesets.txt tilesets"), this);
+            mgr->loadTilesets(true);
+            TilesetManager::instance()->waitForTilesets();
+            break;
+        }
+    }
+}
+
 void MainWindow::launchWorldEd()
 {
     QString path = QApplication::applicationDirPath();
@@ -2049,8 +2065,6 @@ void MainWindow::convertToLot()
         return;
     }
 
-    delete clone; // FIXME: release tilesets?
-
     if (ObjectGroup *og = dialog.objectGroup()) {
         QString lotName = dialog.filePath();
         MapObject *o = new MapObject(QLatin1String("lot"), lotName,
@@ -2058,6 +2072,8 @@ void MainWindow::convertToLot()
                                      clone->size());
         undoStack->push(new AddMapObject(mMapDocument, og, o));
     }
+
+    delete clone; // FIXME: release tilesets?
 
     if (oldSelection != mMapDocument->tileSelection())
         undoStack->push(new ChangeTileSelection(mMapDocument, oldSelection));

@@ -29,6 +29,7 @@
 #include "worlded/worldedmgr.h"
 #include "zprogress.h"
 #include <QFileInfo>
+#include <QMessageBox>
 #endif
 
 #include <QDebug>
@@ -204,9 +205,15 @@ int main(int argc, char *argv[])
     if (!w.InitConfigFiles())
         return 0;
 
-    foreach (QString f, Preferences::instance()->worldedFiles())
-        if (!f.isEmpty() && QFileInfo(f).exists())
-            WorldEd::WorldEdMgr::instance()->addProject(f);
+    foreach (QString f, Preferences::instance()->worldedFiles()) {
+        if (f.isEmpty())
+            continue;
+        if (QFileInfo::exists(f) == false) {
+            QMessageBox::warning(&w, QLatin1String("Missing PZW"), QLatin1String("WorldEd project not found:\n%1").arg(f));
+            continue;
+        }
+        WorldEd::WorldEdMgr::instance()->addProject(f);
+    }
 #endif // ZOMBOID
 
     QObject::connect(&a, &TiledApplication::fileOpenRequest,
