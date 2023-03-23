@@ -36,6 +36,7 @@
 #include "mapcomposite.h"
 #include "mapmanager.h"
 #include "preferences.h"
+#include "worldconstants.h"
 #include "zlevelrenderer.h"
 #include "zlevelsmodel.h"
 #include "worlded/world.h"
@@ -43,6 +44,7 @@
 #include "worlded/worldedmgr.h"
 #endif
 #include "map.h"
+#include "maplevel.h"
 #include "mapobject.h"
 #include "movelayer.h"
 #include "objectgroup.h"
@@ -72,6 +74,7 @@ MapDocument::MapDocument(Map *map, const QString &fileName):
     mFileName(fileName),
     mMap(map),
     mLayerModel(new LayerModel(this)),
+    mCurrentLevel(INVALID_LEVEL),
     mMapObjectModel(new MapObjectModel(this)),
 #ifdef ZOMBOID
     mLevelsModel(new ZLevelsModel(this)),
@@ -81,6 +84,12 @@ MapDocument::MapDocument(Map *map, const QString &fileName):
     mUndoStack(new QUndoStack(this))
 {
 #ifdef ZOMBOID
+    for (int z = MIN_WORLD_LEVEL; z <= MAX_WORLD_LEVEL; z++) {
+        if (mMap->mapLevelForZ(z)) {
+            continue;
+        }
+        mMap->addMapLevel(new MapLevel(mMap, z));
+    }
     mMapComposite = new MapComposite(MapManager::instance()->newFromMap(map, fileName));
     connect(mMapComposite->bmpBlender(), &BmpBlender::regionAltered,
             this, &MapDocument::bmpBlenderRegionAltered);
@@ -123,10 +132,28 @@ MapDocument::MapDocument(Map *map, const QString &fileName):
     }
 
 #ifdef ZOMBOID
+    mRenderer->setMinLevel(mMapComposite->minLevel());
     mRenderer->setMaxLevel(mMapComposite->maxLevel());
+
+    mCurrentLevel = INVALID_LEVEL;
+    mCurrentLayerIndex = -1;
+    if (map->mapLevels().isEmpty() == false) {
+        MapLevel *largestNegative = nullptr;
+        for (MapLevel *mapLevel : map->mapLevels()) {
+            if (mapLevel->level() >= 0) {
+                mCurrentLevel = mapLevel->level();
+                mCurrentLayerIndex = mapLevel->layerCount() ? map->layers().indexOf(mapLevel->layerAt(0)) : -1;
+                break;
+            }
+            largestNegative = mapLevel;
+        }
+        if (mCurrentLevel == INVALID_LEVEL && largestNegative != nullptr) {
+            mCurrentLevel = largestNegative->level();
+            mCurrentLayerIndex = largestNegative->layerCount() ? map->layers().indexOf(largestNegative->layerAt(0)) : -1;
+        }
+    }
 #endif
 
-    mCurrentLayerIndex = (map->layerCount() == 0) ? -1 : 0;
     mLayerModel->setMapDocument(this);
 
     // Forward signals emitted from the layer model
@@ -253,6 +280,12 @@ void MapDocument::setCurrentLayerIndex(int index)
     Q_ASSERT(index >= -1 && index < mMap->layerCount());
     mCurrentLayerIndex = index;
 
+    int level = (index == -1) ? INVALID_LEVEL : currentLayer()->level();
+    if (level != mCurrentLevel) {
+        mCurrentLevel = level;
+        emit currentLevelChanged(mCurrentLevel);
+    }
+
     /* This function always sends the following signal, even if the index
      * didn't actually change. This is because the selected index in the layer
      * table view might be out of date anyway, and would otherwise not be
@@ -272,6 +305,31 @@ Layer *MapDocument::currentLayer() const
         return 0;
 
     return mMap->layerAt(mCurrentLayerIndex);
+}
+
+void MapDocument::setCurrentLevel(int z)
+{
+    Q_ASSERT((z == INVALID_LEVEL) || (z >= MIN_WORLD_LEVEL && z <= MAX_WORLD_LEVEL));
+    if (mCurrentLevel == z) {
+        return;
+    }
+    mCurrentLevel = z;
+    emit currentLevelChanged(z);
+
+    if (mCurrentLevel == INVALID_LEVEL) {
+        if (mCurrentLayerIndex != -1) {
+            mCurrentLayerIndex = -1;
+            emit currentLayerIndexChanged(mCurrentLayerIndex);
+        }
+    } else {
+        if (MapLevel *mapLevel = map()->mapLevelForZ(mCurrentLevel)) {
+            mCurrentLayerIndex = mapLevel->layers().isEmpty() ? -1 : map()->layers().indexOf(mapLevel->layers().first());
+            emit currentLayerIndexChanged(mCurrentLayerIndex);
+        } else if (mCurrentLayerIndex != -1) {
+            mCurrentLayerIndex = -1;
+            emit currentLayerIndexChanged(mCurrentLayerIndex);
+        }
+    }
 }
 
 void MapDocument::resizeMap(const QSize &size, const QPoint &offset)
@@ -891,13 +949,13 @@ void MapDocument::onLayerAboutToBeRemoved(int index)
 #endif
     emit layerAboutToBeRemoved(index);
 }
+
 void MapDocument::onLayerRemoved(int index)
 {
     // Bring the current layer index to safety
     bool currentLayerRemoved = mCurrentLayerIndex == mMap->layerCount();
     if (currentLayerRemoved)
         mCurrentLayerIndex = mCurrentLayerIndex - 1;
-
 
     emit layerRemoved(index);
 

@@ -119,11 +119,7 @@ MapDocument *NewMapDialog::createMap()
                        tileWidth, tileHeight);
 
     // Add one filling tile layer to new maps
-#ifdef ZOMBOID
-    map->addLayer(new TileLayer(tr("0_Tile Layer 1"), 0, 0, mapWidth, mapHeight));
-#else
     map->addLayer(new TileLayer(tr("Tile Layer 1"), 0, 0, mapWidth, mapHeight));
-#endif
 
 #ifdef ZOMBOID
     QRandomGenerator prng(QDateTime().toSecsSinceEpoch());

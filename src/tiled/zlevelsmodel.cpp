@@ -21,6 +21,7 @@
 #include "layermodel.h"
 #include "mapcomposite.h"
 #include "mapdocument.h"
+#include "maplevel.h"
 #include "renamelayer.h"
 #include "tilelayer.h"
 
@@ -100,9 +101,7 @@ QVariant ZLevelsModel::data(const QModelIndex &index, int role) const
     if (Layer *layer = item->layer) {
         switch (role) {
         case Qt::DisplayRole:
-            if (layer->isTileLayer() && !layer->asTileLayer()->group())
-                return layer->name() + QLatin1String(" <no level>");
-            return MapComposite::layerNameWithoutPrefix(layer);
+            return layer->name();
         case Qt::EditRole:
             return layer->name();
         case Qt::DecorationRole:
@@ -121,7 +120,7 @@ QVariant ZLevelsModel::data(const QModelIndex &index, int role) const
             return QVariant();
         }
     }
-    if (item->level >= 0) {
+    if (item->level != INVALID_LEVEL) {
         switch (role) {
         case Qt::DisplayRole:
         case Qt::EditRole:
@@ -166,7 +165,7 @@ bool ZLevelsModel::setData(const QModelIndex &index, const QVariant &value,
         }
         return false;
     }
-    if (item->level >= 0) {
+    if (item->level != INVALID_LEVEL) {
         switch (role) {
         case Qt::CheckStateRole: {
             Qt::CheckState c = static_cast<Qt::CheckState>(value.toInt());
@@ -226,7 +225,7 @@ QModelIndex ZLevelsModel::index(Layer *layer) const
 CompositeLayerGroup *ZLevelsModel::toLayerGroup(const QModelIndex &index) const
 {
     if (Item *item = toItem(index)) {
-        if (item->level >= 0)
+        if (item->level != INVALID_LEVEL)
             return mMapDocument->mapComposite()->layerGroupForLevel(item->level);
     }
     return 0;
@@ -272,6 +271,10 @@ void ZLevelsModel::setMapDocument(MapDocument *mapDocument)
                 this, &ZLevelsModel::layerAboutToBeRemoved);
 
         mRootItem = new Item();
+
+        for (MapLevel *mapLevel : mMapDocument->map()->mapLevels()) {
+            createLevelItemIfNeeded(mapLevel->level());
+        }
 
         foreach (Layer *layer, mMapDocument->map()->layers())
             new Item(createLevelItemIfNeeded(layer->level()), 0, layer);

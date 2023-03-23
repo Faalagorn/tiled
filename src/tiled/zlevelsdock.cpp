@@ -342,7 +342,7 @@ void ZLevelsView::onActivated(const QModelIndex &index)
 
 void ZLevelsView::selectionChanged(const QItemSelection &selected, const QItemSelection &deselected)
 {
-    QTreeView::selectionChanged(selected, deselected);
+     QTreeView::selectionChanged(selected, deselected);
 
     if (!mMapDocument || mSynching)
         return;
@@ -357,6 +357,14 @@ void ZLevelsView::selectionChanged(const QItemSelection &selected, const QItemSe
             if (layerIndex != mMapDocument->currentLayerIndex()) {
                 mSynching = true;
                 mMapDocument->setCurrentLayerIndex(layerIndex);
+                mSynching = false;
+            }
+        }
+        if (CompositeLayerGroup *lg = model()->toLayerGroup(index)) {
+            int level = lg->level();
+            if (level != mMapDocument->currentLevel()) {
+                mSynching = true;
+                mMapDocument->setCurrentLevel(level);
                 mSynching = false;
             }
         }

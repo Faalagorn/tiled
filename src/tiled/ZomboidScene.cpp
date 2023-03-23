@@ -300,13 +300,14 @@ void ZomboidScene::updateCurrentLayerHighlight()
     if (!mMapDocument)
         return;
 
+    int currentLevel = mMapDocument->currentLevel();
+
     Layer *currentLayer = mMapDocument->currentLayer();
     int currentLayerIndex = mMapDocument->currentLayerIndex();
 
-    if (currentLayer) {
-        int level = currentLayer->level();
-        if (mTileLayerGroupItems.contains(level)) {
-            CompositeLayerGroup *layerGroup = mTileLayerGroupItems[level]->layerGroup();
+    if (currentLevel != INVALID_LEVEL) {
+        if (mTileLayerGroupItems.contains(currentLevel)) {
+            CompositeLayerGroup *layerGroup = mTileLayerGroupItems[currentLevel]->layerGroup();
             if (layerGroup->layerCount()) {
                 currentLayer = layerGroup->layers().first();
                 currentLayerIndex = mMapDocument->map()->layers().indexOf(currentLayer);
@@ -332,24 +333,24 @@ void ZomboidScene::updateCurrentLayerHighlight()
     }
 
     QGraphicsItem *currentItem = mLayerItems[currentLayerIndex];
-    if (currentLayer->asTileLayer() && currentLayer->asTileLayer()->group()) {
-        Q_ASSERT(mTileLayerGroupItems.contains(currentLayer->level()));
-        if (mTileLayerGroupItems.contains(currentLayer->level()))
-            currentItem = mTileLayerGroupItems[currentLayer->level()];
+    if (currentLevel != INVALID_LEVEL) {
+        Q_ASSERT(mTileLayerGroupItems.contains(currentLevel));
+        if (mTileLayerGroupItems.contains(currentLevel))
+            currentItem = mTileLayerGroupItems[currentLevel];
     }
 
     // Hide items above the current item
     int index = 0;
     foreach (QGraphicsItem *item, mLayerItems) {
         Layer *layer = mMapDocument->map()->layerAt(index);
-        bool visible = layer->isVisible() && (layer->level() <= currentLayer->level());
+        bool visible = layer->isVisible() && (layer->level() <= currentLevel);
         if (layer->isObjectGroup() && (layer->level() != currentLayer->level()))
             visible = false;
         item->setVisible(visible);
         ++index;
     }
     foreach (CompositeLayerGroupItem *item, mTileLayerGroupItems) {
-        bool visible = item->layerGroup()->isVisible() && (item->layerGroup()->level() <= currentLayer->level());
+        bool visible = item->layerGroup()->isVisible() && (item->layerGroup()->level() <= currentLevel);
         item->setVisible(visible);
     }
 
@@ -530,7 +531,7 @@ void ZomboidScene::layerLevelChanged(int index, int oldLevel)
                 MapComposite *lot = mMapObjectToLot[mapObject];
                 lot->setGroupVisible(og->isVisible());
                 lot->setLevel(og->level());
-                mMapDocument->mapComposite()->ensureMaxLevels(lot->levelOffset() + lot->maxLevel());
+                mMapDocument->mapComposite()->checkMinMaxLevels(lot->levelOffset() + lot->minLevel(), lot->levelOffset() + lot->maxLevel());
                 // Recalculate the MapObject bounds
                 onLotUpdated(lot, mapObject);
                 synch = true;

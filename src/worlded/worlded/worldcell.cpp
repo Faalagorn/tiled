@@ -18,6 +18,7 @@
 #include "worldcell.h"
 
 #include "world.h"
+#include "worldconstants.h"
 
 WorldCellLot::WorldCellLot(WorldCell *cell, const QString &name, int x, int y,
                            int z, int width, int height)
@@ -72,8 +73,9 @@ WorldCell::WorldCell(World *world, int x, int y)
     , mY(y)
     , mWorld(world)
 {
-    for (int z = 0; z < 16; z++)
+    for (int z = MIN_WORLD_LEVEL; z <= MAX_WORLD_LEVEL; z++) {
         mLevels += new WorldCellLevel(this, z);
+    }
 }
 
 WorldCell::~WorldCell()
@@ -88,16 +90,26 @@ void WorldCell::setMapFilePath(const QString &path)
     mMapFilePath = path;
 }
 
+WorldCellLevel *WorldCell::levelForZ(int z) const
+{
+    for (WorldCellLevel *cellLevel : levels()) {
+        if (cellLevel->z() == z) {
+            return cellLevel;
+        }
+    }
+    return nullptr;
+}
+
 void WorldCell::insertLot(int index, WorldCellLot *lot)
 {
     mLots.insert(index, lot);
-    mLevels[lot->level()]->insertLot(index, lot);
+    levelForZ(lot->level())->insertLot(index, lot);
 }
 
 WorldCellLot *WorldCell::removeLot(int index)
 {
     WorldCellLot *lot = mLots.takeAt(index);
-    mLevels[lot->level()]->removeLot(index);
+    levelForZ(lot->level())->removeLot(index);
     return lot;
 }
 

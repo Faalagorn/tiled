@@ -218,11 +218,13 @@ void WorldCellLotModel::setWorldCell(WorldCell *cell)
     if (mCell) {
         mRoot = new Item;
 
-        for (int z = 0; z < mCell->levelCount(); z++) {
-            Item *levelItem = new Item(mRoot, 0, cell->levelAt(z));
+        for (int i = 0; i < mCell->levelCount(); i++) {
+            WorldCellLevel *cellLevel = cell->levelAt(i);
+            Item *levelItem = new Item(mRoot, 0, cellLevel);
             foreach (WorldCellLot *lot, mCell->lots()) {
-                if (lot->level() == z)
+                if (lot->level() == cellLevel->z()) {
                     new Item(levelItem, 0, lot);
+                }
             }
         }
     }
@@ -263,7 +265,7 @@ WorldCellLotModel::Item *WorldCellLotModel::toItem(WorldCellLot *lot) const
 {
     if (!mRoot)
         return 0;
-    Item *parent = toItem(lot->cell()->levelAt(lot->level()));
+    Item *parent = toItem(lot->cell()->levelForZ(lot->level()));
     foreach (Item *item, parent->children)
         if (item->lot == lot)
             return item;
@@ -435,7 +437,7 @@ void WorldEdDock::restoreExpandedLevels(MapDocument *mapDoc)
     if (mExpandedLevels.contains(mapDoc)) {
         if (WorldCell *cell = ui->view->model()->cell()) {
             foreach (int z, mExpandedLevels[mapDoc]) {
-                if (WorldCellLevel *level = cell->levelAt(z))
+                if (WorldCellLevel *level = cell->levelForZ(z))
                     ui->view->setExpanded(ui->view->model()->index(level), true);
             }
         }

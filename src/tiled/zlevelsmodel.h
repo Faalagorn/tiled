@@ -18,6 +18,8 @@
 #ifndef ZLEVELSMODEL_H
 #define ZLEVELSMODEL_H
 
+#include "worldconstants.h"
+
 #include <QAbstractItemModel>
 #include <QIcon>
 
@@ -83,7 +85,7 @@ private:
     public:
         Item()
             : parent(0)
-            , level(-1)
+            , level(INVALID_LEVEL)
             , layer(0)
         {
 
@@ -99,7 +101,7 @@ private:
 
         Item(Item *parent, int indexInParent, Layer *layer)
             : parent(parent)
-            , level(-1)
+            , level(INVALID_LEVEL)
             , layer(layer)
         {
             parent->children.insert(indexInParent, this);

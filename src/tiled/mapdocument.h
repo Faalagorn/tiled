@@ -143,12 +143,8 @@ public:
     Layer *currentLayer() const;
 
 #ifdef ZOMBOID
-    int currentLevel() const
-    {
-        if (Layer *layer = currentLayer())
-            return layer->level();
-        return 0;
-    }
+    void setCurrentLevel(int z);
+    int currentLevel() const { return mCurrentLevel; }
 
     /* For the visibility slider in the LayerDock. */
     void setMaxVisibleLayer(int index) { mMaxVisibleLayer = index; }
@@ -345,6 +341,8 @@ signals:
     void layerRemovedFromGroup(int index, CompositeLayerGroup *oldGroup);
 
     void layerLevelChanged(int index, int oldLevel);
+
+    void currentLevelChanged(int z);
 #endif
 
     /**
@@ -445,6 +443,7 @@ private:
     QRegion mTileSelection;
     QList<MapObject*> mSelectedObjects;
     MapRenderer *mRenderer;
+    int mCurrentLevel;
     int mCurrentLayerIndex;
     MapObjectModel *mMapObjectModel;
 #ifdef ZOMBOID

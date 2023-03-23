@@ -112,12 +112,14 @@ void ShadowMap::layerRemoved(int index)
 
 void ShadowMap::layerRenamed(int index, const QString &name)
 {
-    mMapComposite->map()->layerAt(index)->setName(name);
+    Layer *layer = mMapComposite->map()->layerAt(index);
+    layer->setName(name);
     mMapComposite->layerRenamed(index);
 
-    if (name.startsWith(QLatin1String("0_")))
+    if (layer->level() == 0) {
         mMapComposite->layerGroupForLevel(0)->setBmpBlendLayers(
                     mMapComposite->bmpBlender()->tileLayers());
+    }
 }
 
 void ShadowMap::regionAltered(const QRegion &rgn, Layer *layer)
@@ -185,7 +187,7 @@ MiniMapRenderWorker::MiniMapRenderWorker(MapInfo *mapInfo, InterruptibleThread *
     mRenderer->setMaxLevel(mShadowMap->mMapComposite->maxLevel());
     mRenderer->mAbortDrawing = thread->var();
 
-    QRectF r = mShadowMap->mMapComposite->boundingRect(mRenderer);
+    QRectF r = mShadowMap->mMapComposite->boundingRect(mRenderer, false);
     qreal scale = 512.0 / r.width();
     QSize imageSize = QRectF(QPoint(), r.size() * scale).toAlignedRect().size();
     mImage = QImage(imageSize, QImage::Format_ARGB32);
@@ -215,7 +217,7 @@ void MiniMapRenderWorker::work()
     if (!mRedrawAll && mDirtyRect.isEmpty())
         return;
 
-    QRectF sceneRect = mShadowMap->mMapComposite->boundingRect(mRenderer);
+    QRectF sceneRect = mShadowMap->mMapComposite->boundingRect(mRenderer, false);
     QSize mapSize = sceneRect.size().toSize();
     if (mapSize.isEmpty())
         return;
@@ -299,7 +301,7 @@ void MiniMapRenderWorker::processChanges(const QList<MapChange *> &changes)
     IN_WORKER_THREAD
 
     ShadowMap &sm = *mShadowMap;
-    QRectF oldBounds = sm.mMapComposite->boundingRect(mRenderer);
+    QRectF oldBounds = sm.mMapComposite->boundingRect(mRenderer, false);
     bool redrawAll = mRedrawAll;
 
     foreach (MapChange *cp, changes) {
@@ -419,7 +421,7 @@ void MiniMapRenderWorker::processChanges(const QList<MapChange *> &changes)
     // Now all the changes are applied, see if the size of the image should change.
     mRenderer->setMaxLevel(mShadowMap->mMapComposite->maxLevel());
     sm.mMapComposite->synch();
-    QRectF newBounds = sm.mMapComposite->boundingRect(mRenderer);
+    QRectF newBounds = sm.mMapComposite->boundingRect(mRenderer, false);
     if (oldBounds != newBounds) {
         int width = 512;
         qreal scale = width / newBounds.width();

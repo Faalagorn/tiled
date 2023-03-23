@@ -167,6 +167,7 @@ public:
     { return pixelToTileCoords(point.x(), point.y(), level); }
 
     QPoint pixelToTileCoordsInt(const QPointF &point, int level = 0) const;
+    QPoint pixelToTileCoordsNearest(const QPointF &point, int level = 0) const;
 
     /**
      * Returns the pixel coordinates matching the given tile coordinates.
@@ -217,8 +218,13 @@ public:
         return screenPolygon;
     }
 
+    void setMinLevel(int level) { mMinLevel = level; }
+    int minLevel() const { return mMinLevel; }
+
     void setMaxLevel(int level) { mMaxLevel = level; }
     int maxLevel() const { return mMaxLevel; }
+
+    int totalLevels() const { return maxLevel() - minLevel() + 1; }
 
     bool *mAbortDrawing;
 
@@ -259,6 +265,7 @@ protected:
 private:
     const Map *mMap;
 #ifdef ZOMBOID
+    int mMinLevel;
     int mMaxLevel;
     bool m2x;
 #endif

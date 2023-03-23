@@ -45,6 +45,7 @@
 #include "map.h"
 #include "mapdocument.h"
 #include "mapdocumentactionhandler.h"
+#include "maplevel.h"
 #include "mapobject.h"
 #include "maprenderer.h"
 #include "mapscene.h"
@@ -72,6 +73,7 @@
 #include "tmxmapwriter.h"
 #include "undodock.h"
 #include "utils.h"
+#include "worldconstants.h"
 #include "zoomable.h"
 #include "commandbutton.h"
 #include "objectsdock.h"
@@ -2832,6 +2834,10 @@ void MainWindow::updateActions()
         else
             name = MapComposite::layerNameWithoutPrefix(name);
         mCurrentLayerButton->setText(tr("Layer: %1 ").arg(name));
+    } else if ((mMapDocument != nullptr) && (mMapDocument->currentLevel() != INVALID_LEVEL)) {
+        mCurrentLevelButton->setText(tr("Level: %1 ").arg(mMapDocument->currentLevel()));
+        mCurrentLayerButton->setText(tr("Layer: <none> "));
+        mCurrentLayerButton->setEnabled(false);
     } else {
         mCurrentLevelButton->setText(tr("Level: <none> "));
         mCurrentLayerButton->setText(tr("Layer: <none> "));
@@ -2897,9 +2903,10 @@ void MainWindow::aboutToShowLevelMenu()
     mCurrentLevelMenu->clear();
     QStringList items;
     items.prepend(QString::number(0));
-    foreach (CompositeLayerGroup *layerGroup, mMapDocument->mapComposite()->sortedLayerGroups()) {
-        if (!layerGroup->level()) continue;
-        items.prepend(QString::number(layerGroup->level()));
+    MapComposite *mapComposite = mMapDocument->mapComposite();
+    for (int z = mapComposite->minLevel(); z <= mapComposite->maxLevel(); z++) {
+        if (z == 0) continue;
+        items.prepend(QString::number(z));
     }
     foreach (QString item, items) {
         QAction *action = mCurrentLevelMenu->addAction(item);
@@ -2956,12 +2963,12 @@ void MainWindow::triggeredLevelMenu(QAction *action)
 {
     if (!mMapDocument) return;
     int level = action->text().toInt();
-    if (CompositeLayerGroup *layerGroup = mMapDocument->mapComposite()->tileLayersForLevel(level)) {
+    if (MapLevel *mapLevel = mMapDocument->map()->mapLevelForZ(level)) {
         if (Layer *layer = mMapDocument->currentLayer()) {
             // Try to switch to a layer with the same name in the new level
             QString name = MapComposite::layerNameWithoutPrefix(layer);
             if (layer->isTileLayer()) {
-                foreach (TileLayer *tl, layerGroup->layers()) {
+                for (TileLayer *tl : mapLevel->tileLayers()) {
                     QString name2 = MapComposite::layerNameWithoutPrefix(tl);
                     if (name == name2) {
                         int index = mMapDocument->map()->layers().indexOf(tl);
@@ -2970,14 +2977,12 @@ void MainWindow::triggeredLevelMenu(QAction *action)
                     }
                 }
             } else if (layer->isObjectGroup()) {
-                foreach (ObjectGroup *og, mMapDocument->map()->objectGroups()) {
-                    if (og->level() == level) {
-                        QString name2 = MapComposite::layerNameWithoutPrefix(og);
-                        if (name == name2) {
-                            int index = mMapDocument->map()->layers().indexOf(og);
-                            mMapDocument->setCurrentLayerIndex(index);
-                            return;
-                        }
+                for (ObjectGroup *og : mapLevel->objectGroups()) {
+                    QString name2 = MapComposite::layerNameWithoutPrefix(og);
+                    if (name == name2) {
+                        int index = mMapDocument->map()->layers().indexOf(og);
+                        mMapDocument->setCurrentLayerIndex(index);
+                        return;
                     }
                 }
             }
@@ -3282,6 +3287,8 @@ void MainWindow::mapDocumentChanged(MapDocument *mapDocument)
     if (mMapDocument) {
         connect(mMapDocument, &MapDocument::fileNameChanged,
                 this, &MainWindow::updateWindowTitle);
+        connect(mapDocument, &MapDocument::currentLevelChanged,
+                this, &MainWindow::updateActions);
         connect(mapDocument, &MapDocument::currentLayerIndexChanged,
                 this, &MainWindow::updateActions);
         connect(mapDocument, &MapDocument::tileSelectionChanged,

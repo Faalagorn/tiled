@@ -330,6 +330,7 @@ public:
     { return mLevels.size(); }
     WorldCellLevel *levelAt(int index) const
     { return (index >= 0 && index < mLevels.size()) ? mLevels[index] : 0; }
+    WorldCellLevel *levelForZ(int z) const;
 
     void insertLot(int index, WorldCellLot *lot);
     WorldCellLot *removeLot(int index);

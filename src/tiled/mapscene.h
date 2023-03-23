@@ -187,6 +187,8 @@ private slots:
     void currentLayerIndexChanged();
 
 #ifdef ZOMBOID
+    void currentLevelChanged(int z);
+
     virtual void mapChanged();
 #else
     void mapChanged();

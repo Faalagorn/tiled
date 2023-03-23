@@ -148,6 +148,8 @@ void MapScene::setMapDocument(MapDocument *mapDocument)
                 this, &MapScene::layerRemoved);
         connect(mMapDocument, &MapDocument::layerChanged,
                 this, &MapScene::layerChanged);
+        connect(mMapDocument, &MapDocument::currentLevelChanged,
+                this, &MapScene::currentLevelChanged);
         connect(mMapDocument, &MapDocument::currentLayerIndexChanged,
                 this, &MapScene::currentLayerIndexChanged);
         connect(mMapDocument, &MapDocument::objectsAdded,
@@ -322,6 +324,15 @@ void MapScene::regionChanged(const QRegion &region, Layer *layer)
                                                                   margins.right(),
                                                                   margins.bottom()));
     }
+}
+
+void MapScene::currentLevelChanged(int z)
+{
+    updateCurrentLayerHighlight();
+#ifdef ZOMBOID
+    // LevelIsometric orientation may move the grid
+    mGridItem->currentLayerIndexChanged();
+#endif
 }
 #else
 void MapScene::repaintRegion(const QRegion &region)

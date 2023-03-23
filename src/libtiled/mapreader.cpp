@@ -35,6 +35,7 @@
 #include "imagelayer.h"
 #include "objectgroup.h"
 #include "map.h"
+#include "maplevel.h"
 #include "mapobject.h"
 #include "tile.h"
 #include "tilelayer.h"
@@ -53,6 +54,10 @@ using namespace SharedTools;
 
 using namespace Tiled;
 using namespace Tiled::Internal;
+
+#define VERSION1 1 // The original TileZed version for map elements is "1.0"
+#define VERSION2 2 // Added layer attribute "level"
+#define VERSION_LATEST VERSION2
 
 namespace Tiled {
 namespace Internal {
@@ -116,6 +121,7 @@ private:
     void readProperty(Properties *properties);
 
 #ifdef ZOMBOID
+    bool readLayerLevel(QString &name, int &level);
     void readBmpSettings();
     QRgb rgbFromString(const QString &s, bool &ok);
     void readBmpAliases();
@@ -135,6 +141,7 @@ private:
     QString mError;
     QString mPath;
     Map *mMap;
+    int mVersion;
     GidMapper mGidMapper;
     bool mReadingExternalTileset;
 
@@ -226,6 +233,26 @@ Map *MapReaderPrivate::readMap()
     Q_ASSERT(xml.isStartElement() && xml.name() == QLatin1String("map"));
 
     const QXmlStreamAttributes atts = xml.attributes();
+
+    mVersion = -1;
+    if (atts.hasAttribute(QLatin1String("version"))) {
+        bool conversionOK = false;
+        float version = atts.value(QLatin1String("version")).toFloat(&conversionOK);
+        if (conversionOK == false) {
+            xml.raiseError(tr("Invalid map version: \"%1\"").arg(atts.value(QLatin1String("version")).toString()));
+            return nullptr;
+        }
+        mVersion = (int) version;
+        if (mVersion > VERSION_LATEST) {
+            xml.raiseError(tr("Unsupported map version: \"%1\"").arg(mVersion));
+            return nullptr;
+        }
+        if (mVersion < VERSION1) {
+            xml.raiseError(tr("Unsupported map version: \"%1\"").arg(mVersion));
+            return nullptr;
+        }
+    }
+
     const int mapWidth =
             atts.value(QLatin1String("width")).toString().toInt();
     const int mapHeight =
@@ -428,13 +455,19 @@ TileLayer *MapReaderPrivate::readLayer()
     Q_ASSERT(xml.isStartElement() && xml.name() == QLatin1String("layer"));
 
     const QXmlStreamAttributes atts = xml.attributes();
-    const QString name = atts.value(QLatin1String("name")).toString();
+    /*const */QString name = atts.value(QLatin1String("name")).toString();
     const int x = atts.value(QLatin1String("x")).toString().toInt();
     const int y = atts.value(QLatin1String("y")).toString().toInt();
     const int width = atts.value(QLatin1String("width")).toString().toInt();
     const int height = atts.value(QLatin1String("height")).toString().toInt();
 
+    int level = 0;
+    if (readLayerLevel(name, level) == false) {
+        return nullptr;
+    }
+
     TileLayer *tileLayer = new TileLayer(name, x, y, width, height);
+    tileLayer->setLevel(level);
     readLayerAttributes(tileLayer, atts);
 
     while (xml.readNextStartElement()) {
@@ -704,13 +737,19 @@ ObjectGroup *MapReaderPrivate::readObjectGroup()
     Q_ASSERT(xml.isStartElement() && xml.name() == QLatin1String("objectgroup"));
 
     const QXmlStreamAttributes atts = xml.attributes();
-    const QString name = atts.value(QLatin1String("name")).toString();
+    /*const*/ QString name = atts.value(QLatin1String("name")).toString();
     const int x = atts.value(QLatin1String("x")).toString().toInt();
     const int y = atts.value(QLatin1String("y")).toString().toInt();
     const int width = atts.value(QLatin1String("width")).toString().toInt();
     const int height = atts.value(QLatin1String("height")).toString().toInt();
 
+    int level = 0;
+    if (readLayerLevel(name, level) == false) {
+        return nullptr;
+    }
+
     ObjectGroup *objectGroup = new ObjectGroup(name, x, y, width, height);
+    objectGroup->setLevel(level);
     readLayerAttributes(objectGroup, atts);
 
     const QString color = atts.value(QLatin1String("color")).toString();
@@ -734,13 +773,19 @@ ImageLayer *MapReaderPrivate::readImageLayer()
     Q_ASSERT(xml.isStartElement() && xml.name() == QLatin1String("imagelayer"));
 
     const QXmlStreamAttributes atts = xml.attributes();
-    const QString name = atts.value(QLatin1String("name")).toString();
+    /*const*/ QString name = atts.value(QLatin1String("name")).toString();
     const int x = atts.value(QLatin1String("x")).toString().toInt();
     const int y = atts.value(QLatin1String("y")).toString().toInt();
     const int width = atts.value(QLatin1String("width")).toString().toInt();
     const int height = atts.value(QLatin1String("height")).toString().toInt();
 
+    int level = 0;
+    if (readLayerLevel(name, level) == false) {
+        return nullptr;
+    }
+
     ImageLayer *imageLayer = new ImageLayer(name, x, y, width, height);
+    imageLayer->setLevel(level);
     readLayerAttributes(imageLayer, atts);
 
     while (xml.readNextStartElement()) {
@@ -928,6 +973,29 @@ void MapReaderPrivate::readProperty(Properties *properties)
     }
 
     properties->insert(propertyName, propertyValue);
+}
+
+bool MapReaderPrivate::readLayerLevel(QString &name, int &level)
+{
+    level = 0;
+    if (mVersion >= VERSION2) {
+        const QXmlStreamAttributes atts = xml.attributes();
+        if (atts.hasAttribute(QLatin1String("level")) == false) {
+            xml.raiseError(QLatin1String("Layer missing level attribute"));
+            return false;
+        }
+        bool conversionOK;
+        level = atts.value(QLatin1String("level")).toInt(&conversionOK);
+        if (conversionOK == false) {
+            xml.raiseError(QLatin1String("Layer has invalid level attribute \"%1\"").arg(atts.value(QLatin1String("level"))));
+            return false;
+        }
+    } else {
+        if (MapLevel::levelForLayer(name, &level)) {
+            name = MapLevel::layerNameWithoutPrefix(name);
+        }
+    }
+    return true;
 }
 
 #ifdef ZOMBOID

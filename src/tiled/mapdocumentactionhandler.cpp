@@ -171,6 +171,8 @@ void MapDocumentActionHandler::setMapDocument(MapDocument *mapDocument)
     updateActions();
 
     if (mMapDocument) {
+        connect(mapDocument, &MapDocument::currentLevelChanged,
+                this, &MapDocumentActionHandler::updateActions);
         connect(mapDocument, &MapDocument::currentLayerIndexChanged,
                 this, &MapDocumentActionHandler::updateActions);
         connect(mapDocument, &MapDocument::tileSelectionChanged,
