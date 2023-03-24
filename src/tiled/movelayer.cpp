@@ -23,6 +23,7 @@
 #include "layer.h"
 #include "layermodel.h"
 #include "mapdocument.h"
+#include "maplevel.h"
 
 #include <QCoreApplication>
 
@@ -54,15 +55,31 @@ void MoveLayer::moveLayer()
     const bool selectedBefore = (mIndex == currentIndex);
     const int prevIndex = mIndex;
 
+    Layer *layer = mMapDocument->map()->layerAt(mIndex);
+    MapLevel *mapLevel = mMapDocument->map()->mapLevelForZ(layer->level());
+    bool bLastInLevel = layer == mapLevel->layers().last();
+    bool bFirstInLevel = layer == mapLevel->layers().first();
+
     LayerModel *layerModel = mMapDocument->layerModel();
-    Layer *layer = layerModel->takeLayerAt(mIndex);
+    layer = layerModel->takeLayerAt(mIndex);
 
     // Change the direction and index to swap undo/redo
     mIndex = (mDirection == Down) ? mIndex - 1 : mIndex + 1;
     mDirection = (mDirection == Down) ? Up : Down;
 
+    int newLevel = layer->level();
+    if ((mDirection == Down) && bLastInLevel) {
+        newLevel++; // mDirection was Up
+        mIndex--; // Layer index doesn't change, only the level
+    }
+    if ((mDirection == Up) && bFirstInLevel) {
+        newLevel--; // mDirection was Down
+        mIndex++; // Layer index doesn't change, only the level
+    }
+
     const bool selectedAfter = (mIndex == currentIndex);
 
+    layer->setLevel(newLevel);
     layerModel->insertLayer(mIndex, layer);
 
     // Set the layer that is now supposed to be selected

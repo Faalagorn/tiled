@@ -20,7 +20,7 @@
 #include "mainwindow.h"
 #include "mapdocument.h"
 #include "mapscene.h"
-#include "worldeddock.h"
+#include "preferences.h"
 
 #include "worlded/world.h"
 #include "worlded/worldcell.h"
@@ -171,6 +171,9 @@ WorldCellLot *WorldLotTool::topmostLotAt(const QPointF &scenePos)
     if (mCell) {
         for (int y = -1; y <= 1; y++) {
             for (int x = -1; x <= 1; x++) {
+                if (!Preferences::instance()->showAdjacentMaps() && !(x == 0 && y == 0)) {
+                    continue;
+                }
                 WorldCell *cell = mCell->world()->cellAt(mCell->pos() + QPoint(x, y));
                 if (!cell) continue;
                 foreach (WorldCellLevel *level, cell->levels()) {
@@ -199,6 +202,9 @@ WorldCellLot *WorldLotTool::topmostLotAt(const QPointF &scenePos)
 
 WorldCell *WorldLotTool::adjacentCellAt(const QPointF &scenePos)
 {
+    if (!Preferences::instance()->showAdjacentMaps()) {
+        return nullptr;
+    }
     if (mCell) {
         QPoint tilePos = mScene->mapDocument()->renderer()->pixelToTileCoordsInt(
                     scenePos, mScene->mapDocument()->currentLevel());
@@ -256,7 +262,7 @@ void WorldLotTool::updateHoverItem(WorldCellLot *lot)
             }
             QRect lotBounds = lot->bounds().translated(origin);
 
-            QPolygonF polygon = mScene->mapDocument()->renderer()->tileToPixelCoords(lotBounds);
+            QPolygonF polygon = mScene->mapDocument()->renderer()->tileToPixelCoords(lotBounds, lot->level());
             mHoverItem->setPolygon(polygon);
             mHoverItem->setVisible(true);
             mHoverItem->setToolTip(QDir::toNativeSeparators(lot->mapName()));

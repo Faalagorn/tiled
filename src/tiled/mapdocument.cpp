@@ -280,10 +280,12 @@ void MapDocument::setCurrentLayerIndex(int index)
     Q_ASSERT(index >= -1 && index < mMap->layerCount());
     mCurrentLayerIndex = index;
 
-    int level = (index == -1) ? INVALID_LEVEL : currentLayer()->level();
-    if (level != mCurrentLevel) {
-        mCurrentLevel = level;
-        emit currentLevelChanged(mCurrentLevel);
+    if (index != -1) {
+        int level = currentLayer()->level();
+        if (level != mCurrentLevel) {
+            mCurrentLevel = level;
+            emit currentLevelChanged(mCurrentLevel);
+        }
     }
 
     /* This function always sends the following signal, even if the index
@@ -429,7 +431,7 @@ void MapDocument::addLayer(Layer::Type layerType)
     Layer *layer = 0;
     QString name;
 
-#if 1
+#ifdef ZOMBOID
     // Create the new layer in the same level as the current layer.
     // Stack it with other layers of the same type in level-order.
     int level = currentLevel();
@@ -454,21 +456,22 @@ void MapDocument::addLayer(Layer::Type layerType)
 
     switch (layerType) {
     case Layer::TileLayerType:
-        name = tr("%1_Tile Layer %2").arg(level).arg(mMap->tileLayerCount() + 1);
+        name = tr("Tile Layer %2").arg(mMap->tileLayerCount() + 1);
         layer = new TileLayer(name, 0, 0, mMap->width(), mMap->height());
         break;
     case Layer::ObjectGroupType:
-        name = tr("%1_Object Layer %2").arg(level).arg(mMap->objectGroupCount() + 1);
+        name = tr("Object Layer %2").arg(mMap->objectGroupCount() + 1);
         layer = new ObjectGroup(name, 0, 0, mMap->width(), mMap->height());
         break;
     case Layer::ImageLayerType:
-        name = tr("%1_Image Layer %2").arg(level).arg(mMap->imageLayerCount() + 1);
+        name = tr("Image Layer %2").arg(mMap->imageLayerCount() + 1);
         layer = new ImageLayer(name, 0, 0, mMap->width(), mMap->height());
         break;
     case Layer::AnyLayerType:
         break; // Q_ASSERT below will fail.
     }
     Q_ASSERT(layer);
+    layer->setLevel(level);
 #else
     switch (layerType) {
     case Layer::TileLayerType:
@@ -551,8 +554,13 @@ void MapDocument::mergeLayerDown()
  */
 void MapDocument::moveLayerUp(int index)
 {
-    if (index < 0 || index >= mMap->layerCount() - 1)
+    Layer *layer = map()->layerAt(index);
+    if (layer == nullptr) {
         return;
+    }
+    if ((index >= mMap->layerCount()) && (layer->level() == map()->maxMapLevel()->level())) {
+        return;
+    }
 
     mUndoStack->push(new MoveLayer(this, index, MoveLayer::Up));
 }
@@ -563,8 +571,13 @@ void MapDocument::moveLayerUp(int index)
  */
 void MapDocument::moveLayerDown(int index)
 {
-    if (index < 1 || index >= mMap->layerCount())
+    Layer *layer = map()->layerAt(index);
+    if (layer == nullptr) {
         return;
+    }
+    if ((index < 1) && (layer->level() == map()->minMapLevel()->level())) {
+        return;
+    }
 
     mUndoStack->push(new MoveLayer(this, index, MoveLayer::Down));
 }

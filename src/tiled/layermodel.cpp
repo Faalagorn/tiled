@@ -24,8 +24,6 @@
 #include "mapdocument.h"
 #include "layer.h"
 #include "renamelayer.h"
-#include "tilelayer.h"
-
 
 using namespace Tiled;
 using namespace Tiled::Internal;

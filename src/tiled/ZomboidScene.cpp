@@ -305,17 +305,23 @@ void ZomboidScene::updateCurrentLayerHighlight()
     Layer *currentLayer = mMapDocument->currentLayer();
     int currentLayerIndex = mMapDocument->currentLayerIndex();
 
-    if (currentLevel != INVALID_LEVEL) {
+    if (currentLevel == INVALID_LEVEL) {
+        if (currentLayer != nullptr) {
+            currentLevel = currentLayer->level();
+        }
+    } else {
         if (mTileLayerGroupItems.contains(currentLevel)) {
             CompositeLayerGroup *layerGroup = mTileLayerGroupItems[currentLevel]->layerGroup();
             if (layerGroup->layerCount()) {
                 currentLayer = layerGroup->layers().first();
                 currentLayerIndex = mMapDocument->map()->layers().indexOf(currentLayer);
             }
+        } else {
+            currentLevel = INVALID_LEVEL;
         }
     }
 
-    if (!mHighlightCurrentLayer || !currentLayer) {
+    if (!mHighlightCurrentLayer || (currentLevel == INVALID_LEVEL)) {
         mDarkRectangle->setVisible(false);
 
         // Restore visibility for all non-ZTileLayerGroupItem layers
@@ -332,11 +338,15 @@ void ZomboidScene::updateCurrentLayerHighlight()
         return;
     }
 
-    QGraphicsItem *currentItem = mLayerItems[currentLayerIndex];
-    if (currentLevel != INVALID_LEVEL) {
+    QGraphicsItem *currentItem = nullptr;
+    if (currentLayer) {
+        currentItem = mLayerItems[currentLayerIndex];
+    } else {
         Q_ASSERT(mTileLayerGroupItems.contains(currentLevel));
         if (mTileLayerGroupItems.contains(currentLevel))
             currentItem = mTileLayerGroupItems[currentLevel];
+        else
+            return;
     }
 
     // Hide items above the current item
@@ -344,7 +354,7 @@ void ZomboidScene::updateCurrentLayerHighlight()
     foreach (QGraphicsItem *item, mLayerItems) {
         Layer *layer = mMapDocument->map()->layerAt(index);
         bool visible = layer->isVisible() && (layer->level() <= currentLevel);
-        if (layer->isObjectGroup() && (layer->level() != currentLayer->level()))
+        if (layer->isObjectGroup() && (layer->level() != currentLevel))
             visible = false;
         item->setVisible(visible);
         ++index;

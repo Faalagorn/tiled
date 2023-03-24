@@ -26,8 +26,10 @@
 #include "layer.h"
 #include "map.h"
 #include "mapdocument.h"
+#include "maplevel.h"
 #include "maprenderer.h"
 #include "utils.h"
+#include "worldconstants.h"
 
 #include <QAction>
 #include <QApplication>
@@ -379,9 +381,16 @@ void MapDocumentActionHandler::updateActions()
     int currentLayerIndex = -1;
     QRegion selection;
     bool canMergeDown = false;
+    bool hasLevelAbove = false;
+    bool hasLevelBelow = false;
 
     if (mMapDocument) {
         map = mMapDocument->map();
+
+        int currentLevel = mMapDocument->currentLevel();
+        hasLevelAbove = (currentLevel != INVALID_LEVEL) && (currentLevel < map->maxMapLevel()->level());
+        hasLevelBelow = (currentLevel != INVALID_LEVEL) && (currentLevel > map->minMapLevel()->level());
+
         currentLayerIndex = mMapDocument->currentLayerIndex();
         selection = mMapDocument->tileSelection();
 
@@ -402,16 +411,17 @@ void MapDocumentActionHandler::updateActions()
     mActionAddImageLayer->setEnabled(map);
 
     const int layerCount = map ? map->layerCount() : 0;
-    const bool hasPreviousLayer = currentLayerIndex >= 0
-            && currentLayerIndex < layerCount - 1;
-    const bool hasNextLayer = currentLayerIndex > 0;
+    const bool hasLayerAbove = (currentLayerIndex >= 0) && (currentLayerIndex < layerCount - 1);
+    const bool hasLayerBelow = currentLayerIndex > 0;
+    const bool canMoveLayerUp = hasLevelAbove || hasLayerAbove;
+    const bool canMoveLayerDown = hasLevelBelow || hasLayerBelow;
 
     mActionDuplicateLayer->setEnabled(currentLayerIndex >= 0);
     mActionMergeLayerDown->setEnabled(canMergeDown);
-    mActionSelectPreviousLayer->setEnabled(hasPreviousLayer);
-    mActionSelectNextLayer->setEnabled(hasNextLayer);
-    mActionMoveLayerUp->setEnabled(hasPreviousLayer);
-    mActionMoveLayerDown->setEnabled(hasNextLayer);
+    mActionSelectPreviousLayer->setEnabled(hasLayerAbove);
+    mActionSelectNextLayer->setEnabled(hasLayerBelow);
+    mActionMoveLayerUp->setEnabled(canMoveLayerUp);
+    mActionMoveLayerDown->setEnabled(canMoveLayerDown);
     mActionToggleOtherLayers->setEnabled(layerCount > 1);
     mActionRemoveLayer->setEnabled(currentLayerIndex >= 0);
     mActionRenameLayer->setEnabled(currentLayerIndex >= 0);
