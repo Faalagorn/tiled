@@ -21,6 +21,7 @@
 #include "mapdocument.h"
 #include "mapscene.h"
 #include "preferences.h"
+#include "worldconstants.h"
 
 #include "worlded/world.h"
 #include "worlded/worldcell.h"
@@ -178,6 +179,17 @@ WorldCellLot *WorldLotTool::topmostLotAt(const QPointF &scenePos)
                 if (!cell) continue;
                 foreach (WorldCellLevel *level, cell->levels()) {
                     if (!level->isVisible()) continue;
+                    if (Preferences::instance()->highlightCurrentLayer()) {
+                        int currentLevel = mapDocument()->currentLevel();
+//                        if (currentLevel == INVALID_LEVEL) {
+//                            if (Layer *layer = mapDocument()->currentLayer()) {
+//                                currentLevel = layer->level();
+//                            }
+//                        }
+                        if ((currentLevel != INVALID_LEVEL) && (level->z() > currentLevel)) {
+                            continue;
+                        }
+                    }
                     QPoint tilePos = mScene->mapDocument()->renderer()->pixelToTileCoordsInt(scenePos, level->z());
                     foreach (WorldCellLot *lot, level->lots()) {
                         if (!lot->isVisible()) continue;

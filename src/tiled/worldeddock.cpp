@@ -363,7 +363,11 @@ void WorldEdDock::selectionChanged()
             WorldEd::WorldEdMgr::instance()->setSelectedLots(QSet<WorldCellLot*>() << lot);
             mSynching = false;
             DocumentManager::instance()->ensureRectVisible(
-                        mDocument->renderer()->boundingRect(lot->bounds()));
+                        mDocument->renderer()->boundingRect(lot->bounds(), lot->level()));
+            mDocument->setCurrentLevel(lot->level());
+        }
+        if (WorldCellLevel *level = ui->view->model()->toLevel(index)) {
+            mDocument->setCurrentLevel(level->z());
         }
     }
 }
@@ -371,7 +375,7 @@ void WorldEdDock::selectionChanged()
 void WorldEdDock::activated(const QModelIndex &index)
 {
     if (WorldCellLot *lot = ui->view->model()->toLot(index)) {
-        if (QFileInfo(lot->mapName()).exists())
+        if (QFileInfo::exists(lot->mapName()))
             MainWindow::instance()->openFile(lot->mapName());
     }
 }
@@ -410,7 +414,7 @@ void WorldEdDock::selectedLotsChanged()
 {
     const QSet<WorldCellLot*> &selected = WorldEd::WorldEdMgr::instance()->selectedLots();
     if (selected.size() == 1) {
-        QModelIndex index = ui->view->model()->index(selected.values().first());
+        QModelIndex index = ui->view->model()->index(*selected.constBegin());
         if (index.isValid()) {
             mSynching = true;
             ui->view->setCurrentIndex(index);

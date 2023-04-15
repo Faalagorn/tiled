@@ -777,11 +777,12 @@ QRectF CompositeLayerGroup::boundingRect(const MapRenderer *renderer) const
     // The TileLayer includes the maximum tile size in its draw margins. So
     // we need to subtract the tile size of the map, since that part does not
     // contribute to additional margin.
-
-    boundingRect.adjust(-mDrawMargins.left(),
-                -qMax(0, mDrawMargins.top() - owner()->map()->tileHeight()),
-                qMax(0, mDrawMargins.right() - owner()->map()->tileWidth()),
-                mDrawMargins.bottom());
+    if (!mTileBounds.isEmpty()) {
+        boundingRect.adjust(-mDrawMargins.left(),
+                    -qMax(0, mDrawMargins.top() - owner()->map()->tileHeight()),
+                    qMax(0, mDrawMargins.right() - owner()->map()->tileWidth()),
+                    mDrawMargins.bottom());
+    }
 
     foreach (const SubMapLayers &subMapLayer, mVisibleSubMapLayers) {
         QRectF bounds = subMapLayer.mLayerGroup->boundingRect(renderer);

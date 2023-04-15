@@ -413,8 +413,8 @@ void MapDocumentActionHandler::updateActions()
     const int layerCount = map ? map->layerCount() : 0;
     const bool hasLayerAbove = (currentLayerIndex >= 0) && (currentLayerIndex < layerCount - 1);
     const bool hasLayerBelow = currentLayerIndex > 0;
-    const bool canMoveLayerUp = hasLevelAbove || hasLayerAbove;
-    const bool canMoveLayerDown = hasLevelBelow || hasLayerBelow;
+    const bool canMoveLayerUp = (currentLayerIndex >= 0) && (hasLevelAbove || hasLayerAbove);
+    const bool canMoveLayerDown = (currentLayerIndex >= 0) && (hasLevelBelow || hasLayerBelow);
 
     mActionDuplicateLayer->setEnabled(currentLayerIndex >= 0);
     mActionMergeLayerDown->setEnabled(canMergeDown);

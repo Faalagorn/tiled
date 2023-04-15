@@ -432,28 +432,22 @@ void MapDocument::addLayer(Layer::Type layerType)
     QString name;
 
 #ifdef ZOMBOID
-    // Create the new layer in the same level as the current layer.
-    // Stack it with other layers of the same type in level-order.
-    int level = currentLevel();
     int index = mMap->layerCount();
-    Layer *topLayerOfSameTypeInSameLevel = 0;
-    Layer *bottomLayerOfSameTypeInGreaterLevel = 0;
-    Layer *topLayerOfSameTypeInLesserLevel = 0;
-    foreach (Layer *layer, mMap->layers(layerType)) {
-        if ((layer->level() > level) && !bottomLayerOfSameTypeInGreaterLevel)
-            bottomLayerOfSameTypeInGreaterLevel = layer;
-        if (layer->level() < level)
-            topLayerOfSameTypeInLesserLevel = layer;
-        if (layer->level() == level)
-            topLayerOfSameTypeInSameLevel = layer;
+    int level = currentLevel();
+    MapLevel *mapLevel = mMap->mapLevelForZ(level);
+    if (mapLevel->layerCount(layerType) == 0) {
+        int count = 0;
+        for (MapLevel *mapLevel2 : mMap->mapLevels()) {
+            if (mapLevel2 == mapLevel) {
+                index = count;
+                break;
+            }
+            count += mapLevel2->layerCount();
+        }
+    } else {
+        Layer *layer = mapLevel->layers(layerType).last();
+        index = mMap->layers().indexOf(layer) + 1;
     }
-    if (topLayerOfSameTypeInSameLevel)
-        index = mMap->layers().indexOf(topLayerOfSameTypeInSameLevel) + 1;
-    else if (bottomLayerOfSameTypeInGreaterLevel)
-        index = mMap->layers().indexOf(bottomLayerOfSameTypeInGreaterLevel);
-    else if (topLayerOfSameTypeInLesserLevel)
-        index = mMap->layers().indexOf(topLayerOfSameTypeInLesserLevel) + 1;
-
     switch (layerType) {
     case Layer::TileLayerType:
         name = tr("Tile Layer %2").arg(mMap->tileLayerCount() + 1);
